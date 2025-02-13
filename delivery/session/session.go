@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/AlexNov03/AuthService/errors/externalerr"
-	interr "github.com/AlexNov03/AuthService/errors/internalerr"
 	"github.com/AlexNov03/AuthService/models"
+	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
 )
 
@@ -19,9 +19,8 @@ type SessionUsecase interface {
 }
 
 type UserUsecase interface {
-	GetUserInfo(userID string) (*models.UserInfo, error)
-	AddUserInfo(userInfo *models.UserRegData) string
-	FindUser(loginData *models.UserLoginData) (*models.UserInfo, error)
+	SignUp(regData *models.UserRegData) (*models.UserInfo, error)
+	Login(loginData *models.UserLoginData) (*models.UserInfo, error)
 }
 
 type SessionDelivery struct {
@@ -44,19 +43,21 @@ func (sd *SessionDelivery) Login(w http.ResponseWriter, r *http.Request) {
 	err := json.NewDecoder(r.Body).Decode(loginData)
 
 	if err != nil {
-		externalerr.ProcessBadRequestError(w, "login input data is not valid")
+		externalerr.ProcessBadRequestError(w, err.Error())
 		return
 	}
 
-	userInfo, err := sd.uu.FindUser(loginData)
+	validator := validator.New(validator.WithRequiredStructEnabled())
+	err = validator.Struct(loginData)
 
-	var internalError *interr.InternalError
 	if err != nil {
-		if ok := errors.As(err, &internalError); ok {
-			externalerr.ProcessInternalError(w, internalError)
-			return
-		}
-		externalerr.ProcessInternalServerError(w, "unknown internal server error")
+		externalerr.ProcessBadRequestError(w, err.Error())
+		return
+	}
+
+	userInfo, err := sd.uu.Login(loginData)
+	if err != nil {
+		externalerr.ProcessError(w, err)
 		return
 	}
 
@@ -81,7 +82,7 @@ func (sd *SessionDelivery) LogOut(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie("session_id")
 
 	if errors.Is(err, http.ErrNoCookie) {
-		externalerr.ProcessUnauthorizedError(w, "logout imposiible: user unauthorized")
+		externalerr.ProcessUnauthorizedError(w, "logout impossible: user unauthorized")
 		return
 	}
 
@@ -101,30 +102,23 @@ func (sd *SessionDelivery) SignUp(w http.ResponseWriter, r *http.Request) {
 	err := json.NewDecoder(r.Body).Decode(regData)
 
 	if err != nil {
-		externalerr.ProcessBadRequestError(w, "signup input data is not valid")
+		externalerr.ProcessBadRequestError(w, err.Error())
 		return
 	}
 
-	_, err = sd.uu.FindUser(&models.UserLoginData{Email: regData.Email, Password: regData.Password})
+	validator := validator.New(validator.WithRequiredStructEnabled())
+	err = validator.Struct(regData)
 
-	if err == nil {
-		externalerr.ProcessAlreadyExistsError(w, "this user already exists")
+	if err != nil {
+		externalerr.ProcessBadRequestError(w, err.Error())
 		return
 	}
 
-	var internalError *interr.InternalError
-
-	if ok := errors.As(err, &internalError); ok {
-		if internalError.Code != http.StatusNotFound {
-			externalerr.ProcessInternalError(w, internalError)
-			return
-		}
-	} else {
-		externalerr.ProcessInternalServerError(w, "unknown internal server error")
+	userInfo, err := sd.uu.SignUp(regData)
+	if err != nil {
+		externalerr.ProcessError(w, err)
 		return
 	}
-
-	userID := sd.uu.AddUserInfo(regData)
 
 	sessionID := uuid.NewString()
 
@@ -136,7 +130,7 @@ func (sd *SessionDelivery) SignUp(w http.ResponseWriter, r *http.Request) {
 		Secure:   true,
 	}
 
-	sd.su.AddSession(sessionID, userID)
+	sd.su.AddSession(sessionID, userInfo.ID)
 
 	http.SetCookie(w, cookie)
 	w.WriteHeader(http.StatusOK)

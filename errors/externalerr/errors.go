@@ -2,9 +2,10 @@ package externalerr
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
-	"github.com/AlexNov03/AuthService/errors/internalerr"
+	interr "github.com/AlexNov03/AuthService/errors/internalerr"
 	"github.com/AlexNov03/AuthService/models"
 )
 
@@ -28,7 +29,15 @@ func ProcessUnauthorizedError(w http.ResponseWriter, message string) {
 	json.NewEncoder(w).Encode(models.ExternalError{Error: message})
 }
 
-func ProcessInternalError(w http.ResponseWriter, error *internalerr.InternalError) {
-	w.WriteHeader(error.Code)
-	json.NewEncoder(w).Encode(models.ExternalError{Error: error.Message})
+func ProcessError(w http.ResponseWriter, err error) {
+	var internalError *interr.InternalError
+	if err != nil {
+		if ok := errors.As(err, &internalError); ok {
+			w.WriteHeader(internalError.Code)
+			json.NewEncoder(w).Encode(models.ExternalError{Error: internalError.Message})
+			return
+		}
+		ProcessInternalServerError(w, "unknown internal server error")
+		return
+	}
 }

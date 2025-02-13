@@ -38,7 +38,7 @@ func (sr *SessionRepo) GetSessionUser(sessionID string) (string, error) {
 	if val, ok := sr.storage[sessionID]; ok {
 		return val, nil
 	}
-	return "", interr.NewInternalError(http.StatusNotFound, "repository: no user has this session ID")
+	return "", interr.NewInternalError(http.StatusNotFound, "no user has this session ID")
 }
 
 func (sr *SessionRepo) DeleteSession(sessionID string) {

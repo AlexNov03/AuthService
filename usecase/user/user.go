@@ -1,14 +1,19 @@
 package useruc
 
 import (
+	"errors"
+	"net/http"
+
+	"github.com/AlexNov03/AuthService/errors/internalerr"
 	"github.com/AlexNov03/AuthService/models"
 	"github.com/google/uuid"
 )
 
 type UserRepo interface {
-	GetUserInfo(userID string) (*models.UserInfo, error)
-	AddUserInfo(userID string, userInfo *models.UserRegData)
-	FindUser(loginData *models.UserLoginData) (*models.UserInfo, error)
+	AddUser(userID string, userInfo *models.UserRegData) error
+	GetUserByID(userID string) (*models.UserInfo, error)
+	GetUserByEmail(email string) (*models.UserInfo, error)
+	GetUserByLoginData(loginData *models.UserLoginData) (*models.UserInfo, error)
 }
 
 type UserUsecase struct {
@@ -19,22 +24,32 @@ func NewUserUsecase(userRepo UserRepo) *UserUsecase {
 	return &UserUsecase{repo: userRepo}
 }
 
-func (uc *UserUsecase) GetUserInfo(userID string) (*models.UserInfo, error) {
-	res, err := uc.repo.GetUserInfo(userID)
+func (uc *UserUsecase) SignUp(regData *models.UserRegData) (*models.UserInfo, error) {
+	_, err := uc.repo.GetUserByEmail(regData.Email)
+
+	if err == nil {
+		return nil, internalerr.NewInternalError(http.StatusConflict, "this email is already used")
+	}
+
+	internalError := &internalerr.InternalError{}
+	if ok := errors.As(err, &internalError); ok {
+		if internalError.Code != http.StatusNotFound {
+			return nil, internalError
+		}
+	}
+
+	userID := uuid.NewString()
+	err = uc.repo.AddUser(userID, regData)
+
 	if err != nil {
 		return nil, err
 	}
-	return res, nil
+	return &models.UserInfo{ID: userID, FirstName: regData.FirstName,
+		LastName: regData.LastName, Email: regData.Email}, nil
 }
 
-func (uc *UserUsecase) AddUserInfo(userInfo *models.UserRegData) string {
-	userID := uuid.NewString()
-	uc.repo.AddUserInfo(userID, userInfo)
-	return userID
-}
-
-func (uc *UserUsecase) FindUser(loginData *models.UserLoginData) (*models.UserInfo, error) {
-	info, err := uc.repo.FindUser(loginData)
+func (uc *UserUsecase) Login(loginData *models.UserLoginData) (*models.UserInfo, error) {
+	info, err := uc.repo.GetUserByLoginData(loginData)
 	if err != nil {
 		return nil, err
 	}

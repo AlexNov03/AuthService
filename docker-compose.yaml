@@ -1,0 +1,20 @@
+version: '3.8'
+services:
+    db1:
+        image: postgres:latest
+        container_name: postgres_db_1
+        environment:
+            POSTGRES_USER: alexnov
+            POSTGRES_PASSWORD: alexnov
+            POSTGRES_DB: authdb
+        ports: 
+            - "5432:5432"
+        volumes:
+            - ./data/postgres:/var/lib/postgresql/data
+    mainservice:
+        build: .
+        container_name: mainservice
+        ports: 
+            - "8080:8080"
+        depends_on:
+            - db1
