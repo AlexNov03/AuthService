@@ -8,7 +8,7 @@ make start
 ```shell
 make stop
 ```
-##Работа с миграциями:
+## Работа с миграциями:
 Применить миграцию
 ```shell
 make migrate-up
@@ -17,7 +17,7 @@ make migrate-up
 ```shell
 make migrate-down
 ```
-##Используемые технологии:
+## Используемые технологии:
 - GO
 - PostgreSQL
 - Docker
