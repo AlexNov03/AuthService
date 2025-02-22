@@ -5,11 +5,15 @@ import (
 	"fmt"
 	"os"
 
-	sessiondelivery "github.com/AlexNov03/AuthService/delivery/session"
+	"github.com/AlexNov03/AuthService/delivery/sessiondelivery"
+	"github.com/AlexNov03/AuthService/delivery/taskdelivery"
+	"github.com/AlexNov03/AuthService/middleware"
 	sessionrepo "github.com/AlexNov03/AuthService/repository/session"
+	taskrepo "github.com/AlexNov03/AuthService/repository/task"
 	userrepo "github.com/AlexNov03/AuthService/repository/user"
 	"github.com/AlexNov03/AuthService/server"
 	sessionuc "github.com/AlexNov03/AuthService/usecase/session"
+	taskuc "github.com/AlexNov03/AuthService/usecase/task"
 	useruc "github.com/AlexNov03/AuthService/usecase/user"
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
@@ -36,15 +40,19 @@ func main() {
 	defer db.Close()
 
 	sessionRepo := sessionrepo.NewSessionRepo()
-
 	userRepo := userrepo.NewUserRepo(db)
+	taskRepo := taskrepo.NewTaskRepo(db)
 
 	sessionUC := sessionuc.NewSessionUsecase(sessionRepo)
 	userUC := useruc.NewUserUsecase(userRepo)
+	taskUC := taskuc.NewTaskUsecase(taskRepo)
 
 	sessionDeliv := sessiondelivery.NewSessionDelivery(sessionUC, userUC)
+	taskDeliv := taskdelivery.NewTaskDelivery(taskUC)
 
-	handler := server.NewHandler(sessionDeliv)
+	middleware := middleware.NewMiddleware(sessionUC)
+
+	handler := server.NewHandler(sessionDeliv, taskDeliv, middleware)
 
 	server := server.NewServer(handler)
 

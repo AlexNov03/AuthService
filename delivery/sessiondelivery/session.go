@@ -91,7 +91,8 @@ func (sd *SessionDelivery) LogOut(w http.ResponseWriter, r *http.Request) {
 	cookie.Expires = time.Now().Add(-time.Hour)
 
 	http.SetCookie(w, cookie)
-
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(struct{}{})
 }
 
 func (sd *SessionDelivery) SignUp(w http.ResponseWriter, r *http.Request) {
